@@ -3,12 +3,14 @@ package by.radioegor146.evenutils;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import by.radioegor146.evenutils.ble.BleManager;
 import by.radioegor146.evenutils.view.CursorInfo;
@@ -27,10 +29,19 @@ public class BleBackgroundService extends Service {
 
     private ViewState latestViewState = null;
 
+    private Consumer<Boolean> connectionStateCallback = null;
+    private boolean initialized = false;
+
+    public class LocalBinder extends Binder {
+        BleBackgroundService getService() {
+            return BleBackgroundService.this;
+        }
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return new LocalBinder();
     }
 
     private void handleViewStateUpdate(ViewState newViewState) {
@@ -48,7 +59,7 @@ public class BleBackgroundService extends Service {
         if (usedViewState == null) {
             return;
         }
-        Log.w(MainActivity.class.getName(), "Received new state: " + usedViewState);
+        Log.d(MainActivity.class.getName(), "Received new state: " + usedViewState);
         Bitmap map = this.renderer.renderDualMap(usedViewState);
         CursorInfo cursorInfo = this.renderer.renderCursorOnDualMap(usedViewState);
         if (this.evenRealities.setMapImage(map, false)) {
@@ -63,11 +74,13 @@ public class BleBackgroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.e(BleBackgroundService.class.getName(), "BLE background service started");
+        Log.d(BleBackgroundService.class.getName(), "BLE background service started");
         this.renderer = new ViewRenderer(this);
 
         this.bleManager = new BleManager(this, state -> {
-            // runOnUiThread(() -> textViewConnectionStatus.setText("Connection status: " + (state ? "Connected" : "Disconnected")));
+            if (this.connectionStateCallback != null) {
+                this.connectionStateCallback.accept(state);
+            }
         }, this::putUpdateToQueue);
         this.evenRealities = new EvenRealitiesAdapter(this.bleManager);
     }
@@ -75,13 +88,19 @@ public class BleBackgroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
-            this.bleManager.init();
+            if (!this.initialized) {
+                this.initialized = true;
+                this.bleManager.init();
+            }
             return START_STICKY;
         }
         switch (Objects.requireNonNull(intent.getAction())) {
             case INITIALIZE_ACTION: {
-                this.bleManager.init();
-                this.handleViewStateUpdate(new ViewState(null, null, false));
+                if (!this.initialized) {
+                    this.initialized = true;
+                    this.bleManager.init();
+                    this.handleViewStateUpdate(new ViewState(null, null, false));
+                }
                 break;
             }
             case UPDATE_VIEW_STATE_ACTION: {
@@ -99,5 +118,13 @@ public class BleBackgroundService extends Service {
         if (this.bleManager != null) {
             this.bleManager.deInit();
         }
+    }
+
+    public void setConnectionStateCallback(Consumer<Boolean> connectionStateCallback) {
+        this.connectionStateCallback = connectionStateCallback;
+    }
+
+    public boolean getConnectionStatus() {
+        return this.bleManager.isConnected();
     }
 }

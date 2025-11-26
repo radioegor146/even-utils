@@ -25,7 +25,7 @@ public class BleQueue {
     }
 
     public void queuePacket(QueuedPacket queuedPacket) {
-        Log.w(BleQueue.class.getName(), "Queued packet: " + queuedPacket.getKind() + " " +
+        Log.d(BleQueue.class.getName(), "Queued packet: " + queuedPacket.getKind() + " " +
                 Utils.bytesToHex(queuedPacket.getPacket()));
         packetQueue.add(queuedPacket);
         synchronized (this) {
@@ -34,7 +34,7 @@ public class BleQueue {
     }
 
     private void processNextPacket() {
-        Log.w(BleQueue.class.getName(), "Queue size: " + packetQueue.size());
+        Log.d(BleQueue.class.getName(), "Queue size: " + packetQueue.size());
 
         QueuedPacket queuedPacket = packetQueue.peek();
         if (queuedPacket == null) {
@@ -56,22 +56,27 @@ public class BleQueue {
             throw new RuntimeException("wut? peek was not null, but poll is null?");
         }
 
+        if (!this.manager.isConnected()) {
+            Log.d(BleQueue.class.getName(), "Skipping packet as now is not connected");
+            return;
+        }
+
         switch (queuedPacket.getKind()) {
             case ONLY_LEFT: {
                 currentLeftPacket = queuedPacket;
-                Log.w(BleQueue.class.getName(), "Sent ONLY_LEFT packet: " + Utils.bytesToHex(currentLeftPacket.getPacket()));
+                Log.d(BleQueue.class.getName(), "Sent ONLY_LEFT packet: " + Utils.bytesToHex(currentLeftPacket.getPacket()));
                 this.manager.getLeftGlass().send(currentLeftPacket.getPacket(), currentLeftPacket.getValidator() != null);
                 break;
             }
             case ONLY_RIGHT: {
                 currentRightPacket = queuedPacket;
-                Log.w(BleQueue.class.getName(), "Sent ONLY_RIGHT packet: " + Utils.bytesToHex(currentRightPacket.getPacket()));
+                Log.d(BleQueue.class.getName(), "Sent ONLY_RIGHT packet: " + Utils.bytesToHex(currentRightPacket.getPacket()));
                 this.manager.getRightGlass().send(currentRightPacket.getPacket(), currentRightPacket.getValidator() != null);
                 break;
             }
             case BOTH: {
                 currentBothPacket = queuedPacket;
-                Log.w(BleQueue.class.getName(), "Sent BOTH packet: " + Utils.bytesToHex(currentBothPacket.getPacket()));
+                Log.d(BleQueue.class.getName(), "Sent BOTH packet: " + Utils.bytesToHex(currentBothPacket.getPacket()));
                 this.manager.getLeftGlass().send(currentBothPacket.getPacket(), currentBothPacket.getValidator() != null);
                 this.manager.getRightGlass().send(currentBothPacket.getPacket(), currentBothPacket.getValidator() != null);
                 break;
@@ -87,12 +92,12 @@ public class BleQueue {
         synchronized (this) {
             if (isRight) {
                 if (this.currentRightPacket != null && this.currentRightPacket.getValidator() == null) {
-                    Log.w(BleQueue.class.getName(), "Received ONLY_RIGHT callback on right glass");
+                    Log.d(BleQueue.class.getName(), "Received ONLY_RIGHT callback on right glass");
                     this.currentRightPacket = null;
                     this.processNextPacket();
                 } else if (!this.bothPacketReadyOnRight && this.currentBothPacket != null
                         && this.currentBothPacket.getValidator() == null) {
-                    Log.w(BleQueue.class.getName(), "Received BOTH callback on right glass");
+                    Log.d(BleQueue.class.getName(), "Received BOTH callback on right glass");
                     if (this.bothPacketReadyOnLeft) {
                         this.bothPacketReadyOnLeft = false;
                         this.currentBothPacket = null;
@@ -103,12 +108,12 @@ public class BleQueue {
                 }
             } else {
                 if (this.currentLeftPacket != null && this.currentLeftPacket.getValidator() == null) {
-                    Log.w(BleQueue.class.getName(), "Received ONLY_LEFT callback on left glass");
+                    Log.d(BleQueue.class.getName(), "Received ONLY_LEFT callback on left glass");
                     this.currentLeftPacket = null;
                     this.processNextPacket();
                 } else if (!this.bothPacketReadyOnLeft && this.currentBothPacket != null
                         && this.currentBothPacket.getValidator() == null) {
-                    Log.w(BleQueue.class.getName(), "Received BOTH callback on left glass");
+                    Log.d(BleQueue.class.getName(), "Received BOTH callback on left glass");
                     if (this.bothPacketReadyOnRight) {
                         this.bothPacketReadyOnRight = false;
                         this.currentBothPacket = null;
@@ -126,14 +131,14 @@ public class BleQueue {
             if (isRight) {
                 if (this.currentRightPacket != null && this.currentRightPacket.getValidator() != null) {
                     if (this.currentRightPacket.getValidator().apply(data)) {
-                        Log.w(BleQueue.class.getName(), "Received ONLY_RIGHT callback packet on right glass: " + Utils.bytesToHex(data));
+                        Log.d(BleQueue.class.getName(), "Received ONLY_RIGHT callback packet on right glass: " + Utils.bytesToHex(data));
                         this.currentRightPacket = null;
                         this.processNextPacket();
                     }
                 } else if (!this.bothPacketReadyOnRight && this.currentBothPacket != null
                         && this.currentBothPacket.getValidator() != null) {
                     if (this.currentBothPacket.getValidator().apply(data)) {
-                        Log.w(BleQueue.class.getName(), "Received BOTH callback packet on right glass: " + Utils.bytesToHex(data));
+                        Log.d(BleQueue.class.getName(), "Received BOTH callback packet on right glass: " + Utils.bytesToHex(data));
                         if (this.bothPacketReadyOnLeft) {
                             this.bothPacketReadyOnLeft = false;
                             this.currentBothPacket = null;
@@ -146,14 +151,14 @@ public class BleQueue {
             } else {
                 if (this.currentLeftPacket != null && this.currentLeftPacket.getValidator() != null) {
                     if (this.currentLeftPacket.getValidator().apply(data)) {
-                        Log.w(BleQueue.class.getName(), "Received ONLY_LEFT callback packet on left glass: " + Utils.bytesToHex(data));
+                        Log.d(BleQueue.class.getName(), "Received ONLY_LEFT callback packet on left glass: " + Utils.bytesToHex(data));
                         this.currentLeftPacket = null;
                         this.processNextPacket();
                     }
                 } else if (!this.bothPacketReadyOnLeft && this.currentBothPacket != null
                         && this.currentBothPacket.getValidator() != null) {
                     if (this.currentBothPacket.getValidator().apply(data)) {
-                        Log.w(BleQueue.class.getName(), "Received BOTH callback packet on left glass: " + Utils.bytesToHex(data));
+                        Log.d(BleQueue.class.getName(), "Received BOTH callback packet on left glass: " + Utils.bytesToHex(data));
                         if (this.bothPacketReadyOnRight) {
                             this.bothPacketReadyOnRight = false;
                             this.currentBothPacket = null;

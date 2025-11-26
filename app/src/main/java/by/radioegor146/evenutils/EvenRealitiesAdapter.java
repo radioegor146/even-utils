@@ -57,7 +57,7 @@ public class EvenRealitiesAdapter {
                 data[x / 8 + y * bitmap.getWidth() / 8] |= (byte) (isPixelSet ? (1 << x % 8) : 0);
             }
         }
-        Log.w(EvenRealitiesAdapter.class.getName(), Utils.bytesToHex(data));
+        Log.d(EvenRealitiesAdapter.class.getName(), Utils.bytesToHex(data));
         return data;
     }
 

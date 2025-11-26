@@ -36,7 +36,7 @@ public class ViewRenderer {
 
     private static Bitmap loadBitmapFromAssets(AssetManager assetManager, String fileName) {
         InputStream inputStream = null;
-        Bitmap bitmap = null;
+        Bitmap bitmap;
         try {
             inputStream = assetManager.open(fileName);
             bitmap = BitmapFactory.decodeStream(inputStream);

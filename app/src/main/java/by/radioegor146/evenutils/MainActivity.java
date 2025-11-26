@@ -2,11 +2,17 @@ package by.radioegor146.evenutils;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.media.session.MediaSessionManager;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
@@ -29,7 +35,29 @@ public class MainActivity extends AppCompatActivity {
     private TextView textViewConnectionStatus;
     private Button buttonTest;
 
-    @SuppressLint("SetTextI18n")
+    private BleBackgroundService bleService;
+    private boolean bound = false;
+
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            BleBackgroundService.LocalBinder binder = (BleBackgroundService.LocalBinder) service;
+            bleService = binder.getService();
+            bound = true;
+
+            updateConnectionStatus(bleService.getConnectionStatus());
+            bleService.setConnectionStateCallback(state -> {
+                updateConnectionStatus(state);
+            });
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            bound = false;
+            bleService = null;
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,15 +69,44 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
         this.textViewConnectionStatus = findViewById(R.id.textViewConnectionStatus);
-        this.buttonTest = findViewById(R.id.buttonTest);
 
+        this.buttonTest = findViewById(R.id.buttonTest);
         this.buttonTest.setOnClickListener(v -> {
         });
 
+        this.initializeBleService();
+    }
+
+    public boolean isNotificationServiceEnabled() {
+        String packageName = getPackageName();
+        final String flat = Settings.Secure.getString(getContentResolver(),
+                "enabled_notification_listeners");
+        if (!TextUtils.isEmpty(flat)) {
+            final String[] names = flat.split(":");
+            for (String name : names) {
+                ComponentName cn = ComponentName.unflattenFromString(name);
+                if (cn != null && TextUtils.equals(packageName, cn.getPackageName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void initializeNotifications() {
+        if (!this.isNotificationServiceEnabled()) {
+            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            startActivity(intent);
+        }
+    }
+
+    private void initializeBleService() {
         if (this.initPermissions()) {
             Intent initalizeIntent = new Intent(this, BleBackgroundService.class);
             initalizeIntent.setAction(BleBackgroundService.INITIALIZE_ACTION);
             this.startService(initalizeIntent);
+            this.bindService(initalizeIntent, connection, Context.BIND_AUTO_CREATE);
+            this.initializeNotifications();
         }
     }
 
@@ -69,13 +126,23 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < permissions.length; i++) {
             if (permissions[i].equals(Manifest.permission.BLUETOOTH_CONNECT) && grantResults[i]
                     == PackageManager.PERMISSION_GRANTED) {
-                this.initPermissions();
+                this.initializeBleService();
             }
         }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private void updateConnectionStatus(boolean state) {
+        runOnUiThread(() -> this.textViewConnectionStatus.setText(
+                "Connection status: " + (state ? "Connected" : "Disconnected")));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (this.bound) {
+            this.unbindService(connection);
+            this.bound = false;
+        }
     }
 }

@@ -15,6 +15,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
@@ -33,6 +34,7 @@ import by.radioegor146.evenutils.view.ViewState;
 public class MainActivity extends AppCompatActivity {
 
     private TextView textViewConnectionStatus;
+    private Switch switchMode;
     private Button buttonTest;
 
     private BleBackgroundService bleService;
@@ -48,6 +50,9 @@ public class MainActivity extends AppCompatActivity {
             updateConnectionStatus(bleService.getConnectionStatus());
             bleService.setConnectionStateCallback(state -> {
                 updateConnectionStatus(state);
+            });
+            runOnUiThread(() -> {
+                switchMode.setChecked(bleService.isUsingMapInsteadOfNews());
             });
         }
 
@@ -68,10 +73,22 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+
         this.textViewConnectionStatus = findViewById(R.id.textViewConnectionStatus);
+
+        this.switchMode = findViewById(R.id.switchMode);
+        this.switchMode.setOnCheckedChangeListener((v, checked) -> {
+            if (this.bound) {
+                this.bleService.setUsingMapInsteadOfNews(checked);
+                this.bleService.refresh();
+            }
+        });
 
         this.buttonTest = findViewById(R.id.buttonTest);
         this.buttonTest.setOnClickListener(v -> {
+            if (this.bound) {
+                this.bleService.refresh();
+            }
         });
 
         this.initializeBleService();

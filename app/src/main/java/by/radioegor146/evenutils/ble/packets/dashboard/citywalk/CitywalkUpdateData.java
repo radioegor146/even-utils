@@ -19,7 +19,7 @@ public class CitywalkUpdateData {
             this.cursor = cursor;
         }
 
-        public byte[] serialze() {
+        public byte[] serialize() {
             ByteBuffer buffer = ByteBuffer.allocate(2 + 2 + this.cursor.length);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             buffer.putShort(this.cursorX);
@@ -44,7 +44,7 @@ public class CitywalkUpdateData {
     }
 
     public byte[] serialize() {
-        byte[] rawCursorData = this.cursorData == null ? new byte[0] : this.cursorData.serialze();
+        byte[] rawCursorData = this.cursorData == null ? new byte[0] : this.cursorData.serialize();
         ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + 1 + rawCursorData.length);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         buffer.put((byte) this.dashboardDisplayMode.ordinal());
